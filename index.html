@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS y Cobros - Orocu</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+        
+        :root { 
+            --app-yellow: #FFC107;
+            --app-green: #34A853; 
+            --app-bg: #F8F9FA; 
+            --app-card: #FFFFFF;
+            --text-main: #202124;
+            --text-muted: #5F6368;
+            --border-color: #E8EAED;
+            --danger: #EA4335;
+            --blue: #1A73E8;
+            --brand-azul: #2563eb; 
+            --brand-verde: #16a34a;
+        }
+        
+        body { font-family: 'Roboto', sans-serif; background: var(--app-bg); margin: 0; padding: 0; color: var(--text-main); padding-bottom: 80px; }
+        * { box-sizing: border-box; } 
+        .hidden { display: none !important; }
+        
+        /* HEADER ESTILO APP */
+        .app-header { background-color: var(--app-yellow); height: 15px; width: 100%; }
+        .top-bar { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid var(--border-color); }
+        
+        .container { padding: 15px; }
+
+        /* PESTAÑAS PRINCIPALES */
+        .tabs-wrapper { display: flex; background: #F1F3F4; border-radius: 30px; padding: 4px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 12px; border-radius: 30px; border: none; background: transparent; font-weight: 500; font-size: 15px; color: var(--text-muted); transition: 0.2s; }
+        .tab-btn.active { background: var(--app-green); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+        /* NAVEGACIÓN ENTRE PASOS (VOLVER) */
+        .back-nav { display: flex; align-items: center; color: var(--blue); font-weight: 500; margin-bottom: 15px; cursor: pointer; font-size: 15px; }
+        .back-nav span { margin-right: 8px; font-size: 18px; }
+
+        /* SECCIONES Y TARJETAS */
+        .section-title { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 10px; margin-top: 20px; }
+        .card { background: var(--app-card); border-radius: 12px; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        
+        /* TOGGLES */
+        .toggle-group { display: flex; background: #F1F3F4; border-radius: 8px; padding: 4px; margin-bottom: 15px; }
+        .toggle-btn { flex: 1; background: transparent; border: none; padding: 10px; font-size: 13px; color: var(--text-muted); border-radius: 6px; font-weight: 500; }
+        .toggle-btn.active { background: white; color: var(--blue); font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* INPUTS */
+        input[type="text"], input[type="number"], select { width: 100%; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; font-family: inherit; background: #fff; outline: none; margin-bottom: 10px; }
+        input:focus, select:focus { border-color: var(--app-green); }
+        
+        /* INPUT CANTIDAD CARRITO */
+        .qty-input { width: 45px; text-align: center; border: none; font-size: 16px; font-weight: bold; padding: 0; margin: 0; background: transparent; outline: none; }
+        .qty-input:focus { border-bottom: 2px solid var(--app-green); }
+
+        /* METODOS DE PAGO */
+        .payment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .pay-method-btn { background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 5px; text-align: center; cursor: pointer; transition: 0.1s; }
+        .pay-method-btn.active { border: 2px solid var(--blue); background: #F4F8FE; }
+        .pay-method-icon { font-size: 24px; margin-bottom: 5px; }
+        .pay-method-text { font-size: 12px; font-weight: 500; color: var(--text-main); }
+
+        /* CARRITO */
+        .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+        .qty-control { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 20px; padding: 2px; }
+        .qty-btn { width: 30px; height: 30px; background: transparent; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; display:flex; align-items:center; justify-content:center; }
+        .delete-btn { background: #FCE8E6; color: var(--danger); border: none; border-radius: 8px; width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; cursor:pointer; margin-left:8px; font-size: 14px; }
+
+        /* BOTON FLOTANTE INFERIOR */
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: center; z-index: 100; }
+        .btn-primary { background-color: var(--text-main); color: white; border: none; border-radius: 30px; padding: 15px; font-size: 16px; font-weight: 500; width: 100%; max-width: 400px; cursor: pointer; }
+        
+        /* FACTURAS PENDIENTES */
+        .invoice-row { display: flex; align-items: center; justify-content: space-between; background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; margin-bottom: 10px; }
+        .invoice-checkbox { transform: scale(1.4); margin-right: 15px; accent-color: var(--app-green); }
+        .invoice-amt-input { width: 90px !important; padding: 8px !important; font-size: 16px; font-weight: bold; color: var(--app-green); text-align: right; margin: 0 !important; }
+
+        /* MODAL */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
+        .modal-content { background: white; padding: 15px; border-radius: 12px; width: 100%; max-width: 450px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        /* TICKET ORIGINAL */
+        #web-ticket-preview { width: 100%; background: #fff; border-radius: 8px; border: 1px solid #ccc; padding: 5px; margin-bottom: 15px; }
+        .pos-receipt { font-family: 'Courier New', Courier, monospace; background: white; color: black; width: 100%; padding: 10px; box-sizing: border-box; word-wrap: break-word; }
+        .pos-header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .pos-header h3 { font-size: 24px; font-weight: 900; margin: 0; }
+        .pos-info-grid { font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 8px; }
+        .pos-table { width: 100%; font-size: 14px; margin-bottom: 10px; }
+        .pos-table th { border-bottom: 2px solid #000; text-align: left; }
+        .pos-table td { padding: 4px 0; border-bottom: 1px dotted #eee; }
+        .pos-totals { border-top: 1px dashed #000; padding-top: 10px; margin-bottom: 10px; font-size: 14px; }
+        .pos-totals-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .grand-total { font-size: 18px; font-weight: bold; border-top: 1px dashed #000; padding: 8px 0; margin-top: 5px; }
+        .pos-empties-box { border: 2px solid #000; padding: 8px; margin-bottom: 10px; font-size: 13px; }
+        .pos-empties-box h4 { font-size: 14px; text-align: center; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 2px; margin:0 0 5px 0; font-weight: 900; }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Estilo Envases Vacios UI */
+        .empties-ui { background: #FFFBEB; border: 2px solid #FDE68A; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        .empties-ui label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px; }
+
+        #print-area, .print-only { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 80mm; margin: 0; padding: 0; }
+            .pos-receipt { width: 80mm !important; border: none !important; padding: 4mm !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-header"></div>
+<div class="top-bar">
+    <h2 style="margin: 0; font-size: 18px; font-weight: 500;">Terminal POS</h2>
+    <span id="cloud-status" style="color: var(--app-green); font-size: 12px; font-weight: bold;">☁️ Conectando...</span>
+</div>
+
+<div class="container">
+    <div class="tabs-wrapper">
+        <button id="btn-tab-pos" class="tab-btn active" onclick="switchTab('pos')">Venta</button>
+        <button id="btn-tab-cobros" class="tab-btn" onclick="switchTab('cobros')">Cobrar Deudas</button>
+    </div>
+
+    <div id="view-pos" class="tab-content">
+        
+        <div id="pos-step-1" class="step-container">
+            <div class="section-title">Paso 1: Seleccionar Cliente</div>
+            <div class="card">
+                <div class="toggle-group">
+                    <button id="btn-mode-exist" class="toggle-btn active" onclick="setClientMode('exist')">Directorio</button>
+                    <button id="btn-mode-new" class="toggle-btn" onclick="setClientMode('new')">Casual / Nuevo</button>
+                </div>
+                
+                <div id="wrap-client-exist">
+                    <select id="pos-client" onchange="loadClientData()" style="border:none; border-bottom: 2px solid var(--blue); margin-bottom:0; font-weight: bold;">
+                        <option value="">Buscar cliente...</option>
+                    </select>
+                    
+                    <div id="client-alerts" class="hidden" style="margin-top: 15px; padding: 15px; background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px;">
+                        <div style="font-size: 18px; font-weight: 900; color: var(--danger); border-bottom: 1px solid #FCA5A5; padding-bottom: 5px; margin-bottom: 5px;">
+                            DEUDA TOTAL: $<span id="lbl-debt">0.00</span>
+                        </div>
+                        <div id="lbl-pending-invoices" style="font-size: 12px; color: #7F1D1D; margin-bottom: 10px; max-height: 80px; overflow-y: auto;"></div>
+                        
+                        <div style="font-size: 13px; font-weight: bold; color: var(--text-main); margin-bottom: 5px;">🍾 VACÍOS PENDIENTES:</div>
+                        <div class="grid-2" style="font-size: 12px; background: white; padding: 8px; border-radius: 6px;">
+                            <div style="color: var(--brand-azul);">Azul Reg: <b id="lbl-v-ar">0</b></div>
+                            <div style="color: var(--brand-azul);">Azul ML: <b id="lbl-v-am">0</b></div>
+                            <div style="color: var(--brand-verde);">Verde Reg: <b id="lbl-v-vr">0</b></div>
+                            <div style="color: var(--brand-verde);">Verde Caja: <b id="lbl-v-vc">0</b></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="wrap-client-new" class="hidden">
+                    <input type="text" id="new-c-name" placeholder="Nombre del Cliente (Ej: Juan Pérez)">
+                    <input type="number" id="new-c-phone" placeholder="Teléfono (Opcional)">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:14px; margin-top:5px;">
+                        <input type="checkbox" id="chk-save-client" checked style="width:20px; height:20px; margin:0;"> Guardar cliente en directorio
+                    </label>
+                </div>
+            </div>
+            
+            <div style="height: 60px;"></div>
+            <div class="bottom-bar"><button class="btn-primary" onclick="goToStep(2)">Siguiente: Añadir Productos</button></div>
+        </div>
+
+        <div id="pos-step-2" class="step-container hidden">
+            <div class="back-nav" onclick="goToStep(1)"><span>←</span> Cambiar Cliente</div>
+            
+            <div class="card">
+                <div class="toggle-group">
+                    <button id="btn-prod-cat" class="toggle-btn active" onclick="setProdMode('cat')">Catálogo</button>
+                    <button id="btn-prod-lib" class="toggle-btn" onclick="setProdMode('lib')">Libre / Extra</button>
+                </div>
+
+                <div id="wrap-prod-exist">
+                    <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Selecciona Producto:</label>
+                    <select id="pos-prod" onchange="updatePrice()"><option value="">Catálogo...</option></select>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Origen</label><select id="pos-source" onchange="updatePrice()"><option value="stockDeposito">📦 Depósito</option><option value="stockCuartoFrio">❄️ Cuarto Frío</option></select></div>
+                        <div><label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Precio Unit. ($)</label><input type="number" id="pos-price" step="0.01"></div>
+                    </div>
+                    
+                    <div><label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Cantidad a vender</label><input type="number" id="pos-qty" value="1" min="1" style="font-weight: bold; font-size: 18px; text-align:center; border: 2px solid var(--blue);"></div>
+                    
+                    <div class="empties-ui" style="padding: 10px; margin-top: 10px; margin-bottom: 5px;">
+                        <label style="color:#92400E; font-size:13px; margin-bottom:5px;">🍾 ¿Genera deuda de envase esta venta?</label>
+                        <select id="pos-brand" style="margin:0; border-color:#FDE68A; background: white; font-weight:bold;">
+                            <option value="none">🚫 No requiere envase</option>
+                            <option value="azul_reg">🔵 Azul Regular</option>
+                            <option value="azul_manga">🔵 Azul Manga Larga</option>
+                            <option value="verde_reg">🟢 Verde Regular</option>
+                            <option value="verde_caja">🟢 Verde Caja Negra</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="addToCart(false)" style="background: #E8F0FE; color: var(--blue); border: none; padding: 15px; border-radius: 8px; font-weight: bold; width: 100%; font-size:16px; margin-top:5px;">+ Añadir al carrito</button>
+                </div>
+
+                <div id="wrap-prod-express" class="hidden">
+                    <input type="text" id="exp-name" placeholder="Nombre del Producto Libre">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Precio Unit. ($)</label><input type="number" id="exp-price" step="0.01"></div>
+                        <div><label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Cantidad</label><input type="number" id="exp-qty" value="1" min="1" style="font-weight: bold; font-size: 18px; text-align:center;"></div>
+                    </div>
+                    
+                    <div class="empties-ui" style="padding: 10px; margin-top: 10px; margin-bottom: 5px;">
+                        <label style="color:#92400E; font-size:13px; margin-bottom:5px;">🍾 ¿Genera deuda de envase esta venta?</label>
+                        <select id="exp-brand" style="margin:0; border-color:#FDE68A; background: white; font-weight:bold;">
+                            <option value="none">🚫 Sin envase</option>
+                            <option value="azul_reg">🔵 Azul Regular</option>
+                            <option value="azul_manga">🔵 Azul Manga Larga</option>
+                            <option value="verde_reg">🟢 Verde Regular</option>
+                            <option value="verde_caja">🟢 Verde Caja Negra</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="addToCart(true)" style="background: #FEF7E0; color: #B06000; border: none; padding: 15px; border-radius: 8px; font-weight: bold; width: 100%; font-size:16px; margin-top:5px;">+ Añadir Producto Libre</button>
+                </div>
+            </div>
+
+            <div class="section-title">Resumen del Carrito</div>
+            <div id="cart-container" style="background: white; border: 1px solid var(--border-color); border-radius: 12px; padding: 10px; margin-bottom: 20px;"></div>
+            
+            <div class="flex-between" style="padding: 0 10px; margin-bottom: 20px;">
+                <span style="font-weight: 500; color: var(--text-muted);">Total Venta:</span>
+                <span style="font-size: 24px; font-weight: bold;">$<span id="cart-total">0.00</span></span>
+            </div>
+
+            <div style="height: 60px;"></div>
+            <div class="bottom-bar"><button class="btn-primary" onclick="goToStep(3)">Siguiente: Cobro y Vacíos</button></div>
+        </div>
+
+        <div id="pos-step-3" class="step-container hidden">
+            <div class="back-nav" onclick="goToStep(2)"><span>←</span> Volver a Productos</div>
+            
+            <div class="section-title">Método de pago (Venta actual)</div>
+            <div class="payment-grid">
+                <div class="pay-method-btn active" onclick="selectPayMethod(this)"><div class="pay-method-icon">💵</div><div class="pay-method-text">Efectivo</div></div>
+                <div class="pay-method-btn" onclick="selectPayMethod(this)"><div class="pay-method-icon">🔵</div><div class="pay-method-text">Yappy</div></div>
+                <div class="pay-method-btn" onclick="selectPayMethod(this)"><div class="pay-method-icon">💳</div><div class="pay-method-text">Tarjeta</div></div>
+                <div class="pay-method-btn" onclick="selectPayMethod(this)"><div class="pay-method-icon">🏦</div><div class="pay-method-text">Transf.</div></div>
+                <div class="pay-method-btn" onclick="selectPayMethod(this)"><div class="pay-method-icon">❌</div><div class="pay-method-text">Crédito</div></div>
+            </div>
+
+            <div class="card">
+                <label style="font-size: 13px; font-weight:bold; color: var(--text-muted);">¿Con cuánto dinero paga el cliente esta venta hoy?</label>
+                <input type="number" id="pay-current" value="0" step="0.01" style="font-size: 24px; font-weight: bold; color: var(--app-green); text-align: center; margin-top: 5px;">
+            </div>
+
+            <div class="card">
+                <label style="font-size: 13px; font-weight:bold; color: var(--text-muted);">¿Abona algo a sus facturas viejas?</label>
+                <div id="step3-pending-invoices-list" style="margin-top: 10px;">
+                    </div>
+                <div class="flex-between" id="step3-past-total-container" style="display:none; margin-top:10px; border-top: 1px solid #eee; padding-top:10px;">
+                    <span style="font-size: 13px; font-weight:bold;">Total Abonando a Deuda:</span>
+                    <span style="font-size: 18px; font-weight:bold; color:var(--app-green);">$<span id="step3-pay-past-total">0.00</span></span>
+                </div>
+            </div>
+
+            <div class="section-title" style="color: #92400E;">🍾 Retorno de Envases Físicos</div>
+            <div class="empties-ui">
+                <p style="font-size:13px; margin:0 0 10px 0; color:#92400E;">Ingrese los envases <b>físicos</b> que el cliente está devolviendo en este momento:</p>
+                <div class="grid-2">
+                    <div><label style="color:var(--brand-azul);">Azul Reg.</label><input type="number" id="ret-ar" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-azul);">Azul ML</label><input type="number" id="ret-am" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-verde);">Verde Reg.</label><input type="number" id="ret-vr" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-verde);">Verde Caja</label><input type="number" id="ret-vc" value="0" style="margin:0;"></div>
+                </div>
+            </div>
+
+            <div style="height: 60px;"></div>
+            <div class="bottom-bar"><button class="btn-primary" onclick="processSale()" style="background: var(--app-green);">Completar e Imprimir Factura</button></div>
+        </div>
+    </div>
+
+    <div id="view-cobros" class="tab-content hidden">
+        <div class="section-title">Cliente a Cobrar</div>
+        <div class="card" style="padding: 10px;">
+            <select id="cobro-client" onchange="loadCobrosClient()" style="border:none; margin:0; font-size:16px; font-weight:bold;">
+                <option value="">Selecciona un cliente</option>
+            </select>
+        </div>
+
+        <div id="cobro-info-panel" class="hidden">
+            <div class="flex-between">
+                <div class="section-title">Facturas Pendientes</div>
+                <div style="color: var(--danger); font-weight: bold;">Deuda Total: $<span id="cobro-total-money">0.00</span></div>
+            </div>
+            
+            <div id="cobro-invoices-list"></div>
+            
+            <div class="flex-between" style="background: white; padding: 15px; border-radius: 12px; margin-top: 10px; border: 1px solid var(--app-green);">
+                <span style="font-weight: 500;">Total a Recibir:</span>
+                <span style="font-size: 22px; font-weight: bold; color: var(--app-green);">$<span id="cobro-calc-money">0.00</span></span>
+            </div>
+
+            <div class="section-title" style="color: #92400E; margin-top: 20px;">🍾 Retorno de Envases Físicos</div>
+            <div class="empties-ui">
+                <p style="font-size:13px; margin:0 0 10px 0; color:#92400E;">Descuente los vacíos que el cliente está devolviendo:</p>
+                <div class="grid-2">
+                    <div><label style="color:var(--brand-azul);">Azul Reg. (Debe: <b id="cd-ar">0</b>)</label><input type="number" id="cr-ar" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-azul);">Azul ML (Debe: <b id="cd-am">0</b>)</label><input type="number" id="cr-am" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-verde);">Verde Reg. (Debe: <b id="cd-vr">0</b>)</label><input type="number" id="cr-vr" value="0" style="margin:0;"></div>
+                    <div><label style="color:var(--brand-verde);">Verde Caja (Debe: <b id="cd-vc">0</b>)</label><input type="number" id="cr-vc" value="0" style="margin:0;"></div>
+                </div>
+            </div>
+            
+            <div style="height: 60px;"></div>
+            <div class="bottom-bar"><button class="btn-primary" onclick="processCobro()">Registrar Pago Parcial / Vacíos</button></div>
+        </div>
+    </div>
+</div>
+
+<div id="invoice-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 style="margin:0 0 10px 0; text-align:center; font-size:16px;">Comprobante Generado</h3>
+        
+        <div id="web-ticket-preview">
+            <div id="print-ticket" class="pos-receipt">
+                <div class="pos-header">
+                    <h3 style="font-size:20px; text-align:center; margin:0; font-weight:900;">DISTRIBUIDORA OROCU</h3>
+                    <p id="ticket-title" style="text-align:center; margin:3px 0; font-size:14px; font-weight:bold; background:#eee; padding:2px; border-radius:4px;"></p>
+                    <p style="text-align:center; margin:0; font-size:12px;">RUC: OROCU-12345</p>
+                </div>
+                <div class="pos-info-grid">
+                    <div><strong>DOC:</strong> <span id="pt-id"></span></div>
+                    <div><strong>Fch:</strong> <span id="pt-date"></span></div>
+                    <div><strong>Cli:</strong> <span id="pt-client"></span></div>
+                    <div style="margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;"><strong>Condición:</strong> <span id="pt-payment-type" style="font-weight:bold; color:var(--danger);"></span></div>
+                </div>
+                <table class="pos-table" id="pt-table-container">
+                    <thead><tr><th style="width:15%;">CANT</th><th style="width:55%;">DESC</th><th style="width:30%; text-align:right;">SUBT</th></tr></thead>
+                    <tbody id="pt-items-body"></tbody>
+                </table>
+                
+                <div class="pos-totals" id="pt-totals-container">
+                    <div class="pos-totals-row"><span>Venta del Día:</span> <span>$<span id="pt-total">0.00</span></span></div>
+                    <div class="pos-totals-row" style="color:var(--app-green); font-weight:bold;"><span>Abono Venta Actual:</span> <span>$<span id="pt-pay-current">0.00</span></span></div>
+                    
+                    <div class="pos-totals-row" style="margin-top:5px; padding-top:5px; border-top:1px dotted #ccc;">
+                        <span>Deuda Anterior:</span> <span>$<span id="pt-deuda-ant">0.00</span></span>
+                    </div>
+                    <div class="pos-totals-row" style="color:var(--app-green); font-weight:bold;">
+                        <span>Abono Deuda Vieja:</span> <span>$<span id="pt-pay-past">0.00</span></span>
+                    </div>
+
+                    <div class="pos-totals-row grand-total"><span>NUEVO SALDO TOTAL:</span> <span>$<span id="pt-credit">0.00</span></span></div>
+                </div>
+                
+                <div class="pos-empties-box">
+                    <h4>Control de Envases</h4>
+                    <div style="font-weight:bold; margin-top:5px; border-bottom:1px dotted #ccc;">🔵 AZULES</div>
+                    <div style="display:flex; justify-content:space-between;"><span>Dejó (Reg): <span id="pt-gen-ar">0</span></span><span>Devolvió: <span id="pt-ret-ar">0</span></span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>Dejó (ML): <span id="pt-gen-am">0</span></span><span>Devolvió: <span id="pt-ret-am">0</span></span></div>
+                    
+                    <div style="font-weight:bold; margin-top:5px; border-bottom:1px dotted #ccc;">🟢 VERDES</div>
+                    <div style="display:flex; justify-content:space-between;"><span>Dejó (Reg): <span id="pt-gen-vr">0</span></span><span>Devolvió: <span id="pt-ret-vr">0</span></span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>Dejó (Caja): <span id="pt-gen-vc">0</span></span><span>Devolvió: <span id="pt-ret-vc">0</span></span></div>
+                    
+                    <div style="font-weight:900; text-align:center; background:#eee; padding:3px; margin-top:5px;">SALDO PENDIENTE TOTAL</div>
+                    <div style="font-size:12px; text-align:center; font-weight:bold; margin-top:3px;" id="pt-saldo-final-vacios"></div>
+                </div>
+                
+                <div id="pt-past-payment-container" class="pos-empties-box" style="display:none;">
+                    <div style="font-weight:bold; border-bottom: 1px solid #ccc;">ABONOS REALIZADOS (Deudas)</div>
+                    <div style="white-space: pre-line; margin-top:5px; font-size:11px;" id="pt-past-inv-ref"></div>
+                </div>
+                <p style="text-align:center; margin-top:10px; font-weight:bold; font-size:12px;">¡Gracias por su preferencia!</p>
+            </div>
+        </div>
+
+        <div class="grid-2 no-print">
+            <button class="btn-primary" onclick="printNormal()" style="padding: 10px; font-size: 13px; border-radius: 8px;">🖨️ Normal</button>
+            <button class="btn-primary" style="background:#2563eb; padding: 10px; font-size: 13px; border-radius: 8px;" onclick="printDirectRawBT()">⚡ RawBT</button>
+        </div>
+        <button style="margin-top:10px; padding: 10px; font-size: 13px; width: 100%; border: 2px solid var(--border-color); background: transparent; border-radius: 8px; font-weight: bold; color: var(--text-muted);" onclick="closeModal()">❌ Cerrar</button>
+    </div>
+</div>
+
+<div id="print-area" class="print-only"></div>
+
+<script>
+// ==========================================
+// CONFIGURACIÓN E INICIALIZACIÓN
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBAHoMRYypy19p8r9AZdTM_hfF40jn-UaE",
+  authDomain: "distriorocu.firebaseapp.com",
+  projectId: "distriorocu",
+  storageBucket: "distriorocu.firebasestorage.app",
+  messagingSenderId: "787619838349",
+  appId: "1:787619838349:web:0dfc2f515b087e6938a5c4"
+};
+firebase.initializeApp(firebaseConfig);
+const firestore = firebase.firestore();
+
+let db = { clients: [], products: [], invoices: [], stockVacios: {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0}, vaultBalance: 0 };
+let cart = [];
+
+window.onload = () => {
+    firestore.collection('distribuidora').doc('master').onSnapshot(doc => {
+        if(doc.exists) {
+            db = doc.data();
+            document.getElementById('cloud-status').innerText = "☁️ Conectado";
+            updateUI();
+        }
+    }, err => { 
+        document.getElementById('cloud-status').innerText = "⚠️ Offline"; 
+        document.getElementById('cloud-status').style.color = "var(--danger)";
+    });
+};
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-' + tabId).classList.remove('hidden');
+    document.getElementById('btn-tab-' + tabId).classList.add('active');
+    
+    if(tabId === 'pos') goToStep(1); 
+}
+
+function goToStep(stepNumber) {
+    if(stepNumber === 2) {
+        let isNew = document.getElementById('btn-mode-new').classList.contains('active');
+        if(isNew && document.getElementById('new-c-name').value.trim() === '') return alert("Ingresa el nombre del cliente casual.");
+        if(!isNew && document.getElementById('pos-client').value === '') return alert("Selecciona un cliente del directorio.");
+    }
+    if(stepNumber === 3) {
+        if(cart.length === 0) return alert("El carrito está vacío. Añade productos.");
+    }
+    document.querySelectorAll('.step-container').forEach(el => el.classList.add('hidden'));
+    document.getElementById('pos-step-' + stepNumber).classList.remove('hidden');
+    window.scrollTo(0, 0);
+}
+
+function setClientMode(mode) {
+    let isNew = (mode === 'new');
+    document.getElementById('btn-mode-exist').classList.toggle('active', !isNew);
+    document.getElementById('btn-mode-new').classList.toggle('active', isNew);
+    document.getElementById('wrap-client-exist').classList.toggle('hidden', isNew);
+    document.getElementById('wrap-client-new').classList.toggle('hidden', !isNew);
+}
+
+function setProdMode(mode) {
+    let isLib = (mode === 'lib');
+    document.getElementById('btn-prod-cat').classList.toggle('active', !isLib);
+    document.getElementById('btn-prod-lib').classList.toggle('active', isLib);
+    document.getElementById('wrap-prod-exist').classList.toggle('hidden', isLib);
+    document.getElementById('wrap-prod-express').classList.toggle('hidden', !isLib);
+}
+
+function selectPayMethod(element) {
+    document.querySelectorAll('.pay-method-btn').forEach(btn => btn.classList.remove('active'));
+    element.classList.add('active');
+    if(element.innerText.includes('Crédito')) document.getElementById('pay-current').value = 0;
+    else document.getElementById('pay-current').value = document.getElementById('cart-total').innerText;
+}
+
+function updateUI() {
+    let clOpts = '<option value="">Buscar cliente...</option>' + db.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    
+    let currentClient = document.getElementById('pos-client').value;
+    document.getElementById('pos-client').innerHTML = clOpts;
+    document.getElementById('pos-client').value = currentClient;
+
+    let currentCobroClient = document.getElementById('cobro-client').value;
+    document.getElementById('cobro-client').innerHTML = clOpts;
+    document.getElementById('cobro-client').value = currentCobroClient;
+
+    let prOpts = '<option value="">Catálogo...</option>' + db.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    document.getElementById('pos-prod').innerHTML = prOpts;
+    
+    loadClientData();
+    if(currentCobroClient) loadCobrosClient();
+}
+
+function loadClientData() {
+    let cId = document.getElementById('pos-client').value;
+    let alerts = document.getElementById('client-alerts');
+    
+    if(!cId) { alerts.classList.add('hidden'); return; }
+    
+    let c = db.clients.find(x => x.id == cId);
+    if(c) {
+        let debt = c.credit || 0;
+        let e = c.emptiesData || {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0};
+        
+        document.getElementById('lbl-debt').innerText = debt.toFixed(2);
+        document.getElementById('lbl-v-ar').innerText = e.azul_reg;
+        document.getElementById('lbl-v-am').innerText = e.azul_manga;
+        document.getElementById('lbl-v-vr').innerText = e.verde_reg;
+        document.getElementById('lbl-v-vc').innerText = e.verde_caja;
+        
+        let pendingInvs = db.invoices.filter(i => i.clientId === c.id && i.creditAdded > 0 && i.status === 'Entregada');
+        
+        if(pendingInvs.length > 0) {
+            document.getElementById('lbl-pending-invoices').innerHTML = pendingInvs.map(i => `<div>• DOC-${i.id.toString().substring(6)} (${i.date}): <b>$${i.creditAdded.toFixed(2)}</b></div>`).join('');
+            
+            document.getElementById('step3-pending-invoices-list').innerHTML = pendingInvs.map(i => `
+                <div class="invoice-row" style="padding:10px; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center;">
+                        <input type="checkbox" class="step3-inv-chk invoice-checkbox" value="${i.id}" onchange="toggleStep3InvoicePayment(${i.id})">
+                        <div>
+                            <div style="font-weight: 500; font-size:13px;">DOC-${i.id.toString().substring(6)}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Debe: $${i.creditAdded.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <input type="number" id="step3-pay-amt-${i.id}" class="invoice-amt-input" style="width:75px !important; font-size:14px; padding:4px !important;" value="${i.creditAdded.toFixed(2)}" max="${i.creditAdded}" disabled oninput="calcStep3CobroTotal()">
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('step3-past-total-container').style.display = 'flex';
+            
+        } else {
+            document.getElementById('lbl-pending-invoices').innerHTML = "<div>Sin facturas pendientes</div>";
+            document.getElementById('step3-pending-invoices-list').innerHTML = '<div style="font-size:12px; color:gray; text-align:center;">Sin facturas pendientes</div>';
+            document.getElementById('step3-past-total-container').style.display = 'none';
+        }
+        
+        alerts.classList.remove('hidden');
+    }
+}
+
+function toggleStep3InvoicePayment(invId) {
+    let chk = document.querySelector(`.step3-inv-chk[value="${invId}"]`);
+    let input = document.getElementById('step3-pay-amt-' + invId);
+    if(chk.checked) {
+        input.disabled = false; input.style.border = "1px solid var(--app-green)"; input.style.backgroundColor = "#F0FDF4";
+    } else {
+        input.disabled = true; input.style.border = "1px solid var(--border-color)"; input.style.backgroundColor = "#fff";
+        input.value = input.getAttribute('max'); 
+    }
+    calcStep3CobroTotal();
+}
+function calcStep3CobroTotal() {
+    let total = 0;
+    document.querySelectorAll('.step3-inv-chk:checked').forEach(chk => {
+        let input = document.getElementById('step3-pay-amt-' + chk.value);
+        let val = parseFloat(input.value) || 0;
+        let max = parseFloat(input.getAttribute('max'));
+        if(val > max) { val = max; input.value = max.toFixed(2); }
+        total += val;
+    });
+    document.getElementById('step3-pay-past-total').innerText = total.toFixed(2);
+}
+
+function updatePrice() {
+    let pId = document.getElementById('pos-prod').value;
+    let source = document.getElementById('pos-source').value;
+    let p = db.products.find(x => x.id == pId);
+    if(p) {
+        document.getElementById('pos-price').value = source === 'stockDeposito' ? p.priceHot : p.priceCold;
+        document.getElementById('pos-brand').value = p.brand || 'none';
+    }
+}
+
+function addToCart(isExpress) {
+    if(isExpress) {
+        let n = document.getElementById('exp-name').value;
+        let pr = parseFloat(document.getElementById('exp-price').value);
+        let qty = parseInt(document.getElementById('exp-qty').value) || 1;
+        let brandVal = document.getElementById('exp-brand').value;
+        
+        if(!n || isNaN(pr) || qty < 1) return alert("Rellene los datos correctamente.");
+        cart.push({ prodName: n, source: 'express', qty: qty, price: pr, subtotal: pr*qty, brand: brandVal });
+        
+        document.getElementById('exp-name').value = '';
+        document.getElementById('exp-price').value = '';
+        document.getElementById('exp-qty').value = 1;
+    } else {
+        let pId = document.getElementById('pos-prod').value;
+        let price = parseFloat(document.getElementById('pos-price').value);
+        let source = document.getElementById('pos-source').value;
+        let qty = parseInt(document.getElementById('pos-qty').value) || 1;
+        let brandVal = document.getElementById('pos-brand').value;
+        
+        if(!pId || isNaN(price) || qty < 1) return alert("Seleccione producto, precio y cantidad.");
+        let p = db.products.find(x => x.id == pId);
+        
+        let existingItem = cart.find(i => i.originalProductId == p.id && i.source == source && i.price == price && i.brand == brandVal);
+        
+        if(existingItem) {
+            existingItem.qty += qty;
+            existingItem.subtotal = existingItem.qty * existingItem.price;
+        } else {
+            cart.push({ prodName: p.name, originalProductId: p.id, source: source, qty: qty, price: price, subtotal: price*qty, brand: brandVal });
+        }
+        
+        document.getElementById('pos-prod').value = "";
+        document.getElementById('pos-price').value = "";
+        document.getElementById('pos-qty').value = 1;
+    }
+    renderCart();
+}
+
+function setCartQty(idx, val) {
+    let item = cart[idx];
+    let newQty = parseInt(val);
+    
+    if(isNaN(newQty) || newQty <= 0) {
+        removeCartItem(idx);
+    } else {
+        item.qty = newQty;
+        item.subtotal = item.qty * item.price;
+        renderCart();
+    }
+}
+
+function changeCartQty(idx, delta) {
+    let item = cart[idx];
+    item.qty += delta;
+    if(item.qty <= 0) removeCartItem(idx);
+    else { item.subtotal = item.qty * item.price; renderCart(); }
+}
+
+function removeCartItem(idx) {
+    cart.splice(idx, 1);
+    renderCart();
+}
+
+function renderCart() {
+    let total = cart.reduce((s, i) => s + i.subtotal, 0);
+    
+    if(cart.length === 0) {
+        document.getElementById('cart-container').innerHTML = '<div style="text-align:center; padding:15px; color:var(--text-muted);">Sin productos en carrito.</div>';
+    } else {
+        document.getElementById('cart-container').innerHTML = cart.map((i, idx) => {
+            let brandName = "";
+            if(i.brand === 'azul_reg') brandName = ' (🔵 Az. Reg)';
+            else if(i.brand === 'azul_manga') brandName = ' (🔵 Az. ML)';
+            else if(i.brand === 'verde_reg') brandName = ' (🟢 Ve. Reg)';
+            else if(i.brand === 'verde_caja') brandName = ' (🟢 Ve. Caja)';
+            
+            return `
+            <div class="cart-item">
+                <div style="flex-grow:1;">
+                    <div style="font-size: 15px; font-weight: 500;">${i.prodName} <span style="font-size:12px; color:#92400E;">${brandName}</span></div>
+                    <div style="font-size: 12px; color: var(--text-muted);">${i.source === 'express' ? '✨ Extra' : (i.source === 'stockDeposito' ? '📦 Depósito' : '❄️ Frio')} - $${i.price.toFixed(2)}/u</div>
+                </div>
+                
+                <div class="qty-control" style="margin-right: 10px;">
+                    <button class="qty-btn" onclick="changeCartQty(${idx}, -1)">-</button>
+                    <input type="number" class="qty-input" value="${i.qty}" onchange="setCartQty(${idx}, this.value)">
+                    <button class="qty-btn" onclick="changeCartQty(${idx}, 1)">+</button>
+                </div>
+                
+                <div style="font-weight: bold; width: 85px; text-align: right; display:flex; align-items:center; justify-content:flex-end;">
+                    $${i.subtotal.toFixed(2)}
+                    <button class="delete-btn" onclick="removeCartItem(${idx})">🗑️</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    document.getElementById('cart-total').innerText = total.toFixed(2);
+    
+    let isCredit = false;
+    document.querySelectorAll('.pay-method-btn.active').forEach(btn => {
+        if(btn.innerText.includes('Crédito')) isCredit = true;
+    });
+    if(!isCredit) document.getElementById('pay-current').value = total.toFixed(2);
+}
+
+function processSale() {
+    let isNewClient = document.getElementById('btn-mode-new').classList.contains('active');
+    let clientId = null, clientName = "Consumidor Final", clObj = null;
+
+    if(isNewClient) {
+        clientName = document.getElementById('new-c-name').value;
+        if(document.getElementById('chk-save-client').checked) {
+            clObj = { id: Date.now(), name: clientName, phone: document.getElementById('new-c-phone').value, credit: 0, emptiesData: {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0} };
+            db.clients.push(clObj);
+            clientId = clObj.id;
+        } else {
+            clientId = clientName + " (Casual)";
+            clObj = { name: clientName, credit: 0, emptiesData: {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0} };
+        }
+    } else {
+        clientId = parseInt(document.getElementById('pos-client').value);
+        clObj = db.clients.find(x => x.id === clientId);
+    }
+
+    let totalVenta = cart.reduce((s, i) => s + i.subtotal, 0);
+    let payCurrent = parseFloat(document.getElementById('pay-current').value) || 0;
+    
+    let payPast = 0;
+    let pastInvRefText = "";
+    
+    if(!isNewClient) {
+        document.querySelectorAll('.step3-inv-chk:checked').forEach(chk => {
+            let piId = parseInt(chk.value);
+            let pi = db.invoices.find(x => x.id === piId);
+            let montoAbonado = parseFloat(document.getElementById('step3-pay-amt-' + piId).value) || 0;
+            
+            if(pi && montoAbonado > 0) {
+                payPast += montoAbonado;
+                pi.creditAdded -= montoAbonado;
+                pi.paid += montoAbonado;
+                clObj.credit -= montoAbonado;
+                pastInvRefText += `> DOC-${pi.id.toString().substring(6)}: Abono $${montoAbonado.toFixed(2)} (Saldo restante: $${pi.creditAdded.toFixed(2)})\n`;
+            }
+        });
+    }
+
+    let deudaAnterior = clObj.credit || 0;
+    let deudaAnteriorTicket = deudaAnterior + payPast; 
+    
+    let nuevaDeudaGenerada = Math.max(0, totalVenta - payCurrent);
+    clObj.credit += nuevaDeudaGenerada;
+    
+    db.vaultBalance = (db.vaultBalance || 0) + payCurrent + payPast;
+    
+    let gen = {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0};
+    cart.forEach(i => { if(i.brand && i.brand !== 'none') gen[i.brand] += i.qty; });
+    
+    let ret = { azul_reg: parseInt(document.getElementById('ret-ar').value)||0, azul_manga: parseInt(document.getElementById('ret-am').value)||0, verde_reg: parseInt(document.getElementById('ret-vr').value)||0, verde_caja: parseInt(document.getElementById('ret-vc').value)||0 };
+
+    if(!clObj.emptiesData) clObj.emptiesData = {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0};
+    ['azul_reg', 'azul_manga', 'verde_reg', 'verde_caja'].forEach(b => {
+        clObj.emptiesData[b] = Math.max(0, (clObj.emptiesData[b]||0) + gen[b] - ret[b]);
+        db.stockVacios[b] = (db.stockVacios[b] || 0) + ret[b];
+    });
+    
+    cart.forEach(item => {
+        if(item.source !== 'express') {
+            let p = db.products.find(x => x.id == item.originalProductId);
+            if(p && p[item.source] !== undefined) p[item.source] -= item.qty;
+        }
+    });
+
+    let invId = Date.now();
+    let inv = { id: invId, clientId: clObj.id, items: [...cart], total: totalVenta, paid: payCurrent, creditAdded: nuevaDeudaGenerada, date: new Date().toLocaleDateString(), status: 'Entregada', pastInvPaid: payPast, pastInvRef: pastInvRefText };
+    db.invoices.push(inv);
+    
+    firestore.collection('distribuidora').doc('master').set(db).then(() => {
+        buildTicketView(inv, clObj, totalVenta, deudaAnteriorTicket, payCurrent, payPast, gen, ret);
+        cart = []; renderCart(); 
+        document.getElementById('pay-current').value = 0;
+        ['ret-ar', 'ret-am', 'ret-vr', 'ret-vc'].forEach(id => document.getElementById(id).value = 0);
+        document.getElementById('new-c-name').value = ''; document.getElementById('new-c-phone').value = '';
+        
+        loadClientData();
+        goToStep(1); 
+    });
+}
+
+function loadCobrosClient() {
+    let cId = parseInt(document.getElementById('cobro-client').value);
+    let panel = document.getElementById('cobro-info-panel');
+    
+    if(!cId) { panel.classList.add('hidden'); return; }
+    let c = db.clients.find(x => x.id === cId);
+    if(!c) return;
+
+    panel.classList.remove('hidden');
+    document.getElementById('cobro-total-money').innerText = (c.credit || 0).toFixed(2);
+    
+    let pendingInvs = db.invoices.filter(i => i.clientId === cId && i.creditAdded > 0 && i.status === 'Entregada');
+    
+    document.getElementById('cobro-invoices-list').innerHTML = pendingInvs.length > 0 ? pendingInvs.map(i => `
+        <div class="invoice-row">
+            <div style="display:flex; align-items:center;">
+                <input type="checkbox" class="invoice-checkbox" value="${i.id}" onchange="toggleInvoicePayment(${i.id})">
+                <div>
+                    <div style="font-weight: 500;">DOC-${i.id.toString().substring(6)}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">${i.date} | Debe: $${i.creditAdded.toFixed(2)}</div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; flex-direction:column; align-items:flex-end;">
+                <label style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">Abonar:</label>
+                <input type="number" id="pay-amt-${i.id}" class="invoice-amt-input" value="${i.creditAdded.toFixed(2)}" max="${i.creditAdded}" disabled oninput="calcCobroTotal()">
+            </div>
+        </div>
+    `).join('') : '<div style="text-align:center; padding:20px; color:var(--text-muted);">No hay facturas pendientes.</div>';
+    
+    calcCobroTotal();
+
+    let e = c.emptiesData || {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0};
+    document.getElementById('cd-ar').innerText = e.azul_reg; document.getElementById('cr-ar').value = 0;
+    document.getElementById('cd-am').innerText = e.azul_manga; document.getElementById('cr-am').value = 0;
+    document.getElementById('cd-vr').innerText = e.verde_reg; document.getElementById('cr-vr').value = 0;
+    document.getElementById('cd-vc').innerText = e.verde_caja; document.getElementById('cr-vc').value = 0;
+}
+
+function toggleInvoicePayment(invId) {
+    let chk = document.querySelector(`.invoice-checkbox[value="${invId}"]`);
+    let input = document.getElementById('pay-amt-' + invId);
+    
+    if(chk.checked) {
+        input.disabled = false;
+        input.style.border = "1px solid var(--app-green)";
+        input.style.backgroundColor = "#F0FDF4";
+    } else {
+        input.disabled = true;
+        input.style.border = "1px solid var(--border-color)";
+        input.style.backgroundColor = "#fff";
+        input.value = input.getAttribute('max'); 
+    }
+    calcCobroTotal();
+}
+
+function calcCobroTotal() {
+    let total = 0;
+    document.querySelectorAll('.invoice-checkbox:checked').forEach(chk => {
+        let input = document.getElementById('pay-amt-' + chk.value);
+        let val = parseFloat(input.value) || 0;
+        let max = parseFloat(input.getAttribute('max'));
+        if(val > max) { val = max; input.value = max.toFixed(2); }
+        total += val;
+    });
+    document.getElementById('cobro-calc-money').innerText = total.toFixed(2);
+}
+
+function processCobro() {
+    let cId = parseInt(document.getElementById('cobro-client').value);
+    let c = db.clients.find(x => x.id === cId);
+    if(!c) return;
+
+    let totalDineroRecibido = parseFloat(document.getElementById('cobro-calc-money').innerText);
+    let r_ar = parseInt(document.getElementById('cr-ar').value)||0, r_am = parseInt(document.getElementById('cr-am').value)||0;
+    let r_vr = parseInt(document.getElementById('cr-vr').value)||0, r_vc = parseInt(document.getElementById('cr-vc').value)||0;
+    
+    if(totalDineroRecibido === 0 && (r_ar+r_am+r_vr+r_vc) === 0) return alert("Seleccione facturas para abonar o ingrese envases devueltos.");
+
+    let pastInvRefText = "";
+    let deudaAnteriorTicket = c.credit; 
+
+    if(totalDineroRecibido > 0) {
+        document.querySelectorAll('.invoice-checkbox:checked').forEach(chk => {
+            let pi = db.invoices.find(x => x.id === parseInt(chk.value));
+            if(pi) {
+                let montoAbonado = parseFloat(document.getElementById('pay-amt-' + chk.value).value);
+                pi.creditAdded -= montoAbonado; 
+                pi.paid += montoAbonado; 
+                c.credit -= montoAbonado;
+                pastInvRefText += `> DOC-${pi.id.toString().substring(6)}: Abono $${montoAbonado.toFixed(2)} (Saldo restante: $${pi.creditAdded.toFixed(2)})\n`;
+            }
+        });
+        db.vaultBalance += totalDineroRecibido;
+    }
+
+    let ret = { azul_reg: r_ar, azul_manga: r_am, verde_reg: r_vr, verde_caja: r_vc };
+    ['azul_reg', 'azul_manga', 'verde_reg', 'verde_caja'].forEach(b => {
+        c.emptiesData[b] = Math.max(0, c.emptiesData[b] - ret[b]);
+        db.stockVacios[b] += ret[b];
+    });
+
+    let inv = { id: Date.now(), clientId: c.id, items: [], total: 0, paid: 0, creditAdded: 0, date: new Date().toLocaleDateString(), status: 'Entregada', pastInvRef: pastInvRefText };
+    db.invoices.push(inv);
+
+    firestore.collection('distribuidora').doc('master').set(db).then(() => {
+        buildTicketView(inv, c, 0, deudaAnteriorTicket, 0, totalDineroRecibido, {azul_reg:0, azul_manga:0, verde_reg:0, verde_caja:0}, ret);
+        loadCobrosClient();
+    });
+}
+
+function buildTicketView(inv, cl, totalVenta, deudaAnterior, payCurrent, payPast, gen, ret) {
+    let isSale = (inv.items && inv.items.length > 0);
+    document.getElementById('ticket-title').innerText = isSale ? "TICKET DE VENTA" : "RECIBO DE ABONO / VACÍOS";
+    document.getElementById('pt-id').innerText = inv.id.toString().substring(6);
+    document.getElementById('pt-date').innerText = inv.date;
+    document.getElementById('pt-client').innerText = cl.name;
+
+    let cond = "POR COBRAR";
+    if(inv.total === 0) cond = "ABONO CAJA";
+    else if(payCurrent >= totalVenta) cond = "CONTADO";
+    else if(payCurrent === 0) cond = "CRÉDITO";
+    else cond = "PAGO PARCIAL";
+    
+    document.getElementById('pt-payment-type').innerText = cond;
+    document.getElementById('pt-payment-type').style.color = (cond === "CONTADO" || cond === "ABONO CAJA") ? "var(--app-green)" : "var(--danger)";
+
+    if(isSale) {
+        document.getElementById('pt-table-container').style.display = 'table';
+        document.getElementById('pt-items-body').innerHTML = inv.items.map(i => `<tr><td>${i.qty}</td><td>${i.prodName}<br><small>$${(i.price||0).toFixed(2)}</small></td><td style="text-align:right;">$${(i.subtotal||0).toFixed(2)}</td></tr>`).join('');
+    } else {
+        document.getElementById('pt-table-container').style.display = 'none';
+    }
+
+    if(inv.total === 0 && payPast === 0) {
+        document.getElementById('pt-totals-container').style.display = 'none';
+    } else {
+        document.getElementById('pt-totals-container').style.display = 'block';
+        
+        // ACTUALIZACION DE LOS VALORES EN EL TICKET
+        document.getElementById('pt-total').innerText = totalVenta.toFixed(2);
+        document.getElementById('pt-pay-current').innerText = payCurrent.toFixed(2);
+        
+        document.getElementById('pt-deuda-ant').innerText = deudaAnterior.toFixed(2);
+        document.getElementById('pt-pay-past').innerText = (payPast||0).toFixed(2);
+        
+        document.getElementById('pt-credit').innerText = cl.credit.toFixed(2);
+    }
+
+    document.getElementById('pt-gen-ar').innerText = gen.azul_reg; document.getElementById('pt-ret-ar').innerText = ret.azul_reg;
+    document.getElementById('pt-gen-am').innerText = gen.azul_manga; document.getElementById('pt-ret-am').innerText = ret.azul_manga;
+    document.getElementById('pt-gen-vr').innerText = gen.verde_reg; document.getElementById('pt-ret-vr').innerText = ret.verde_reg;
+    document.getElementById('pt-gen-vc').innerText = gen.verde_caja; document.getElementById('pt-ret-vc').innerText = ret.verde_caja;
+    
+    document.getElementById('pt-saldo-final-vacios').innerHTML = `Azul (Reg: ${cl.emptiesData.azul_reg} | ML: ${cl.emptiesData.azul_manga})<br>Verde (Reg: ${cl.emptiesData.verde_reg} | Caja: ${cl.emptiesData.verde_caja})`;
+
+    if(inv.pastInvRef) {
+        document.getElementById('pt-past-payment-container').style.display = 'block';
+        document.getElementById('pt-past-inv-ref').innerText = inv.pastInvRef;
+    } else {
+        document.getElementById('pt-past-payment-container').style.display = 'none';
+    }
+
+    document.getElementById('invoice-modal').style.display = 'flex';
+}
+
+function printNormal() { document.getElementById('print-area').innerHTML = document.getElementById('web-ticket-preview').innerHTML; window.print(); }
+function printDirectRawBT() {
+    html2canvas(document.getElementById('print-ticket'), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+        window.location.href = "intent:" + canvas.toDataURL('image/png') + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+    });
+}
+function closeModal() { document.getElementById('invoice-modal').style.display = 'none'; }
+
+goToStep(1);
+</script>
+</body>
+</html>
